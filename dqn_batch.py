@@ -1,20 +1,20 @@
-# -*- coding: utf-8 -*-
 import random
 import gym
 import numpy as np
 from collections import deque
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.optimizers import Adam
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
 
 EPISODES = 1000
+
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
-        self.gamma = 0.95    # discount rate
+        self.gamma = 0.95  # discount rate
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
@@ -49,7 +49,7 @@ class DQNAgent:
                 target = (reward + self.gamma *
                           np.amax(self.model.predict(next_state)[0]))
             target_f = self.model.predict(state)
-            target_f[0][action] = target 
+            target_f[0][action] = target
             # Filtering out states and targets for training
             states.append(state[0])
             targets_f.append(target_f[0])
@@ -96,6 +96,6 @@ if __name__ == "__main__":
                 # Logging training loss every 10 timesteps
                 if time % 10 == 0:
                     print("episode: {}/{}, time: {}, loss: {:.4f}"
-                        .format(e, EPISODES, time, loss))  
-        # if e % 10 == 0:
+                          .format(e, EPISODES, time, loss))
+                    # if e % 10 == 0:
         #     agent.save("./save/cartpole-dqn.h5")

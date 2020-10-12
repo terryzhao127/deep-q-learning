@@ -1,23 +1,23 @@
-# -*- coding: utf-8 -*-
 import random
 import gym
 import numpy as np
 from collections import deque
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.optimizers import Adam
-from keras import backend as K
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
 
 import tensorflow as tf
 
 EPISODES = 5000
+
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
-        self.gamma = 0.95    # discount rate
+        self.gamma = 0.95  # discount rate
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.99
@@ -34,7 +34,7 @@ class DQNAgent:
 
     def _huber_loss(self, y_true, y_pred, clip_delta=1.0):
         error = y_true - y_pred
-        cond  = K.abs(error) <= clip_delta
+        cond = K.abs(error) <= clip_delta
 
         squared_loss = 0.5 * K.square(error)
         quadratic_loss = 0.5 * K.square(clip_delta) + clip_delta * (K.abs(error) - clip_delta)
@@ -102,12 +102,12 @@ if __name__ == "__main__":
             # env.render()
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)
-            #reward = reward if not done else -10
-            x,x_dot,theta,theta_dot = next_state
+            # reward = reward if not done else -10
+            x, x_dot, theta, theta_dot = next_state
             r1 = (env.x_threshold - abs(x)) / env.x_threshold - 0.8
             r2 = (env.theta_threshold_radians - abs(theta)) / env.theta_threshold_radians - 0.5
             reward = r1 + r2
-            
+
             next_state = np.reshape(next_state, [1, state_size])
             agent.memorize(state, action, reward, next_state, done)
             state = next_state
