@@ -1,22 +1,24 @@
 # deep-q-learning
 
-Introduction to Making a Simple Game AI with Deep Reinforcement Learning
-
-
-
 ![animation](./assets/animation.gif)
 
-Minimal and Simple Deep Q Learning Implemenation in Keras and Gym. Under 100 lines of code!
+Minimal and Simple Deep Q-Learning implementation in Tensorflow Keras and Gym. Under 100 lines of code!
 
 The explanation for the `dqn.py` code is covered in the blog article
 [https://keon.io/deep-q-learning/](https://keon.io/deep-q-learning/)
 
+## Install
 
-I made minor tweaks to this repository such as `load` and `save` functions for convenience.
+It is convenient to install dependencies with [Conda](https://docs.conda.io/en/latest/):
 
-I also made the `memory` a deque instead of just a list.
-This is in order to limit the maximum number of elements in the memory.
+```shell script
+conda create -f env.yml
+```
 
+## Usage
 
-The training might be unstable for `dqn.py`. This problem is mitigated in `ddqn.py`.
-I'll cover `ddqn` in the next article.
+Simply run the `dqn.py` script:
+
+```shell script
+python3 dqn.py
+```
