@@ -3,9 +3,9 @@ from collections import deque
 
 import gym
 import numpy as np
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.optimizers import Adam
+from tensorflow.python.keras.layers import Dense
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.optimizers import Adam
 
 
 class DQNAgent:
@@ -22,7 +22,6 @@ class DQNAgent:
 
     def _build_model(self):
         """Build Neural Net for Deep Q-learning Model"""
-
         model = Sequential()
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
@@ -34,7 +33,7 @@ class DQNAgent:
         self.replay_buffer.append((state, action, reward, next_state, done))
 
     def act(self, state):
-        if np.random.rand() <= self.epsilon:
+        if np.random.rand() <= self.epsilon:    # np.random.rand(): [0, 1]
             return random.randrange(self.action_size)
         act_values = self.model.predict(state)
         return np.argmax(act_values[0])  # returns action
@@ -66,9 +65,10 @@ if __name__ == '__main__':
     agent = DQNAgent(state_size, action_size)
     # agent.load('./save/cartpole-dqn.h5')
 
+    file = open('data.txt', 'w')
     done = False
     batch_size = 32
-    num_episodes = 1000
+    num_episodes = 20
     for e in range(num_episodes):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
@@ -78,6 +78,8 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
+            file.write(str([state, action, reward, next_state, done]))
+            file.write('\n')
             agent.memorize(state, action, reward, next_state, done)
             state = next_state
             if done:
@@ -87,3 +89,4 @@ if __name__ == '__main__':
                 agent.replay(batch_size)
         # if e % 10 == 0:
         #     agent.save('./save/cartpole-dqn.h5')
+    file.close()
