@@ -1,3 +1,4 @@
+
 import os
 import zmq
 import json
@@ -43,6 +44,14 @@ class DQNAgent:
         return np.argmax(act_values[0])  # returns action
 
     def replay(self, batch_size):
+        minibatch = random.sample(self.replay_buffer, batch_size)
+        for state, action, reward, next_state, done in minibatch:
+            target = reward
+            if not done:
+                target += self.gamma * np.amax(self.model.predict(next_state)[0])
+            target_f = self.model.predict(state)
+            target_f[0][action] = target
+            self.model.fit(state, target_f, epochs=1, verbose=0)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
@@ -62,35 +71,24 @@ if __name__ == '__main__':
     # agent.load('./save/cartpole-dqn.h5')
 
     context = zmq.Context()
-    socket = context.socket(zmq.REP)
-    socket.bind("tcp://*:5000")
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://172.17.0.8:5000")
 
-    cnt = 0
     done = False
     batch_size = 32
     num_episodes = 1000
     for e in range(num_episodes):
-        state = env.reset()
-        state = np.reshape(state, [1, state_size])
+        print('Train episode {}'.format(e))
         for time in range(500):
-            # env.render()
-            action = agent.act(state)
-            next_state, reward, done, _ = env.step(action)
-            reward = reward if not done else -10
-            next_state = np.reshape(next_state, [1, state_size])
+            socket.send_string("message")
+            data = json.loads(socket.recv_string())
 
-            data = {'state': state.tolist(), 'action': int(action), 'reward': reward, 'next_state': next_state.tolist(), 'done': done}
-            cnt += 1
-            message = socket.recv_string()
-            socket.send_string(json.dumps(data))
-
-            state = next_state
-            if done:
-                print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
+            keys = ['state', 'action', 'reward', 'next_state', 'done']
+            item = [data[key] for key in keys]
+            agent.memorize(np.array(item[0]), item[1], item[2], np.array(item[3]), item[4])
+            if data['done']:
                 break
-
-            if cnt > batch_size:
-                if agent.epsilon > agent.epsilon_min:
-                    agent.epsilon *= agent.epsilon_decay
-        if e % 10 == 1:
-            agent.load('./save/cartpole-dqn_{}.h5'.format(e-1))
+            if len(agent.replay_buffer) > batch_size:
+                agent.replay(batch_size)
+        if e % 10 == 0:
+            agent.save('./save/cartpole-dqn_{}.h5'.format(e))
