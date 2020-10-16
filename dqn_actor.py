@@ -1,5 +1,6 @@
 import json
 import random
+import zmq
 from collections import deque
 
 import gym
@@ -31,29 +32,11 @@ class DQNAgent:
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
 
-    def memorize(self, state, action, reward, next_state, done):
-        self.replay_buffer.append((state, action, reward, next_state, done))
-
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         act_values = self.model.predict(state)
         return np.argmax(act_values[0])  # returns action
-
-    def replay(self, batch_size):
-        minibatch = random.sample(self.replay_buffer, batch_size)
-        for state, action, reward, next_state, done in minibatch:
-            target = reward
-            if not done:
-                target += self.gamma * np.amax(self.model.predict(next_state)[0])
-            target_f = self.model.predict(state)
-            target_f[0][action] = target
-            self.model.fit(state, target_f, epochs=1, verbose=0)
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
-
-    def load(self, name):
-        self.model.load_weights(name)
 
     def save(self, name):
         self.model.save_weights(name)
@@ -65,7 +48,9 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
-    # agent.load('./save/cartpole-dqn.h5')
+
+    socket = zmq.Context().socket(zmq.REQ)
+    socket.connect("tcp://172.20.0.2:6080")
 
     done = False
     batch_size = 32
@@ -79,29 +64,21 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
-            agent.memorize(state, action, reward, next_state, done)
-            state = next_state
+            socket.send_string(json.dumps({
+                'now_state': state.tolist(),
+                'action': action,
+                'reward': reward,
+                'next_state': next_state.tolist(),
+                'done': done,
+            }))
             if done:
-                print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
+                print('actor -- episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
             if len(agent.replay_buffer) > batch_size:
-                agent.replay(batch_size)
-
-        filename = 'syf_actor_example.json'
-        res = []
-        print("begin to save!")
-        while agent.replay_buffer:
-            tmp = agent.replay_buffer.popleft()
-            res.append({
-                    'now_state': tmp[0].tolist(),
-                    'action': tmp[1],
-                    'reward': tmp[2],
-                    'next_state': tmp[3].tolist(),
-                    'done': tmp[4],
-                })
-        with open(filename, 'w') as file_obj:
-            json.dump(res, file_obj)
-        print("save successfully!")
-        break
-        # if e % 10 == 0:
-        #     agent.save('./save/cartpole-dqn.h5')
+                if agent.epsilon > agent.epsilon_min:
+                    agent.epsilon *= agent.epsilon_decay
+            state = next_state
+        
+        if e % 10 == 0:
+            agent.save('./save/cartpole-dqn.h5')
+    
