@@ -1,4 +1,3 @@
-
 import os
 import zmq
 import json
@@ -72,7 +71,7 @@ if __name__ == '__main__':
 
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.connect("tcp://172.17.0.8:5000")
+    socket.connect("tcp://172.17.0.16:5000")
 
     done = False
     batch_size = 32

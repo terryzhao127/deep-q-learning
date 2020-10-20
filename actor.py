@@ -59,7 +59,6 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
-    # agent.load('./save/cartpole-dqn.h5')
 
     context = zmq.Context()
     socket = context.socket(zmq.REP)
@@ -89,8 +88,6 @@ if __name__ == '__main__':
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
 
-            if cnt > batch_size:
-                if agent.epsilon > agent.epsilon_min:
-                    agent.epsilon *= agent.epsilon_decay
-        if e % 10 == 1:
-            agent.load('./save/cartpole-dqn_{}.h5'.format(e-1))
+            # if cnt > batch_size:
+            #     if agent.epsilon > agent.epsilon_min:
+            #         agent.epsilon *= agent.epsilon_decay
