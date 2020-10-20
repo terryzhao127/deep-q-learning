@@ -72,7 +72,7 @@ if __name__ == '__main__':
             state = next_state
             socket.send_string(json.dumps({
                 "now_state": state.tolist(),
-                "action": action,
+                "action": int(action),
                 "reward": reward,
                 "next_state": next_state.tolist(),
                 "done": done,
