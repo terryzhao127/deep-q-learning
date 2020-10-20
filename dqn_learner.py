@@ -68,12 +68,11 @@ if __name__ == '__main__':
 
     agent = DQNAgent(state_size, action_size)
 
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 屏蔽INFO and warning信息
+    os.environ['KMP_WARNINGS'] = '0'
     socket = zmq.Context().socket(zmq.REP)
     socket.bind("tcp://*:6080")
 
     os.mkdir("./save")
-    # agent.load('./save/cartpole-dqn.h5')
 
     batch_size = 32
     num_episodes = 1000
