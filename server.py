@@ -2,11 +2,11 @@ import random
 from collections import deque
 
 import gym
+import zmq
 import numpy as np
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
-
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
@@ -22,7 +22,6 @@ class DQNAgent:
 
     def _build_model(self):
         """Build Neural Net for Deep Q-learning Model"""
-
         model = Sequential()
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
@@ -51,39 +50,31 @@ class DQNAgent:
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
-    def load(self, name):
-        self.model.load_weights(name)
-
-    def save(self, name):
-        self.model.save_weights(name)
-
 
 if __name__ == '__main__':
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
+    socket.bind("tcp://*:5556")
+
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
-    # agent.load('./save/cartpole-dqn.h5')
-
     done = False
     batch_size = 32
     num_episodes = 1000
+    cover_num = 0
     for e in range(num_episodes):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
         for time in range(500):
-            # env.render()
-            action = agent.act(state)
-            next_state, reward, done, _ = env.step(action)
-            reward = reward if not done else -10
-            next_state = np.reshape(next_state, [1, state_size])
-            agent.memorize(state, action, reward, next_state, done)
-            state = next_state
-            if done:
+            message = socket.recv()
+            socket.send(b"Cover")
+            message = eval(message)
+            agent.memorize(np.array(message[0]), message[1], message[2], np.array(message[3]), message[4])
+            if message[4]:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        # if e % 10 == 0:
-        #     agent.save('./save/cartpole-dqn.h5')
