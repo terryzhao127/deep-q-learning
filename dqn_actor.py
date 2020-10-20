@@ -1,6 +1,7 @@
+import os
+import zmq
 import json
 import random
-import zmq
 from collections import deque
 
 import gym
@@ -32,14 +33,14 @@ class DQNAgent:
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
 
+    def memorize(self, state, action, reward, next_state, done):
+        self.replay_buffer.append((state, action, reward, next_state, done))
+
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         act_values = self.model.predict(state)
         return np.argmax(act_values[0])  # returns action
-
-    def save(self, name):
-        self.model.save_weights(name)
 
 
 if __name__ == '__main__':
@@ -48,10 +49,13 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
+    # agent.load('./save/cartpole-dqn.h5')
 
-    socket = zmq.Context().socket(zmq.REQ)
-    socket.connect("tcp://172.20.0.2:6080")
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
+    socket.bind("tcp://*:6080")
 
+    cnt = 0
     done = False
     batch_size = 32
     num_episodes = 1000
@@ -64,21 +68,16 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
-            socket.send_string(json.dumps({
-                'now_state': state.tolist(),
-                'action': action,
-                'reward': reward,
-                'next_state': next_state.tolist(),
-                'done': done,
-            }))
+
+            cnt += 1
+            message = socket.recv_string()
+            socket.send_string(json.dumps({{'now_state': state.tolist(), 'action': int(action), 'reward': reward, 'next_state': next_state.tolist(), 'done': done}}))
+
+            state = next_state
             if done:
                 print('actor -- episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
-            if len(agent.replay_buffer) > batch_size:
+
+            if cnt > batch_size:
                 if agent.epsilon > agent.epsilon_min:
                     agent.epsilon *= agent.epsilon_decay
-            state = next_state
-        
-        if e % 10 == 0:
-            agent.save('./save/cartpole-dqn.h5')
-    
