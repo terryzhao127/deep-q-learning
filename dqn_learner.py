@@ -68,12 +68,13 @@ if __name__ == '__main__':
 
     agent = DQNAgent(state_size, action_size)
 
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 屏蔽INFO and warning信息
     socket = zmq.Context().socket(zmq.REP)
     socket.bind("tcp://*:6080")
+
     os.mkdir("./save")
     # agent.load('./save/cartpole-dqn.h5')
 
-    done = False
     batch_size = 32
     num_episodes = 1000
     cnt = 0
@@ -86,7 +87,7 @@ if __name__ == '__main__':
             socket.send_string("receive data successfully!")
             agent.memorize(np.array(data["now_state"]), data["action"], data["reward"], np.array(data["next_state"]), data["done"])
             cnt += 1
-            if done:
+            if data["done"]:
                 break
             if cnt >= batch_size:
                 cnt = 0
