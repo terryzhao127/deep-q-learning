@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 屏蔽INFO信息
     socket = zmq.Context().socket(zmq.REQ)
-    socket.connect("tcp://172.20.0.2:6000")
+    socket.connect("tcp://172.20.0.4:6080")
 
     done = False
     batch_size = 32
