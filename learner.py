@@ -73,13 +73,19 @@ if __name__ == '__main__':
     socket = context.socket(zmq.REQ)
     socket.connect("tcp://172.17.0.16:5000")
 
+    if not os.path.exists('save_learner'):
+        os.mkdir('save_learner')
+
     done = False
     batch_size = 32
     num_episodes = 1000
+    weight = b''
     for e in range(num_episodes):
         print('Train episode {}'.format(e))
         for time in range(500):
-            socket.send_string("message")
+
+            socket.send(weight)
+            weight = b''
             data = json.loads(socket.recv_string())
 
             keys = ['state', 'action', 'reward', 'next_state', 'done']
@@ -90,4 +96,6 @@ if __name__ == '__main__':
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
         if e % 10 == 0:
-            agent.save('./save/cartpole-dqn_{}.h5'.format(e))
+            agent.save('save_learner/cartpole-{}.h5'.format(e))
+            with open('save_learner/cartpole-{}.h5'.format(e), 'rb') as f:
+                weight = f.read()
