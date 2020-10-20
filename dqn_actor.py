@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     agent = DQNAgent(state_size, action_size)
 
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 屏蔽INFO and warning信息
+    os.environ['KMP_WARNINGS'] = '0'  # 屏蔽INFO and warning信息
     socket = zmq.Context().socket(zmq.REQ)
     socket.connect("tcp://172.20.0.4:6080")
 
@@ -84,5 +84,5 @@ if __name__ == '__main__':
                 break
             if cnt >= batch_size:
                 cnt = 0
-                if self.epsilon > self.epsilon_min:
-                    self.epsilon *= self.epsilon_decay
+                if agent.epsilon > agent.epsilon_min:
+                    agent.epsilon *= agent.epsilon_decay
