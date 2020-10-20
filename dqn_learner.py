@@ -1,6 +1,7 @@
+import os
+import zmq
 import json
 import random
-import zmq
 from collections import deque
 
 import gym
@@ -46,9 +47,13 @@ class DQNAgent:
             self.model.fit(state, target_f, epochs=1, verbose=0)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-    
+
+    def load(self, name):
+        self.model.load_weights(name)
+
     def save(self, name):
         self.model.save_weights(name)
+
 
 if __name__ == '__main__':
     env = gym.make('CartPole-v1')
@@ -56,25 +61,22 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
+    # agent.load('./save/cartpole-dqn.h5')
 
-    socket = zmq.Context().socket(zmq.REP)
-    socket.bind("tcp://*:6080")
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://172.20.0.2:6080")
 
     done = False
     batch_size = 32
     num_episodes = 1000
     for e in range(num_episodes):
-        state = env.reset()
-        state = np.reshape(state, [1, state_size])
-        print("learner -- train episodes {}".format(e))
+        print('learner -- train episode {}'.format(e))
         for time in range(500):
-            exper = json.loads(socket.recv_string())
-            agent.memorize(np.array(exper['now_state']), exper['action'], exper['reward'],
-                           exper['next_state'], exper['done'])
-            if exper['done']:
+            socket.send_string("start")
+            data = json.loads(socket.recv_string())
+            agent.memorize(np.array(data['now_state']), data['action'], data['reward'], np.array(data['next_state']), data['done'])
+            if data['done']:
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        
-        if e % 10 == 0:
-            agent.save('./save/cartpole-dqn.h5')
