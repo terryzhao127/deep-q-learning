@@ -1,8 +1,8 @@
-import zmq
-from zhelpers import socket_set_hwm
 import random
 from collections import deque
+
 import gym
+import zmq
 import numpy as np
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
@@ -35,6 +35,7 @@ class DQNAgent:
         #open('agent_data','a').write(str((state, action, reward, next_state, done)) + '\n')
         #self.replay_buffer.append((state, action, reward, next_state, done))
         message = np.array((state, action, reward, next_state, done), dtype = object)
+        print(message)
         socket.send(message)
 
     def act(self, state):
@@ -64,11 +65,6 @@ class DQNAgent:
 
 if __name__ == '__main__':
     context = zmq.Context()
-    CHUNK_SIZE = 250000
-    router = context.socket(zmq.ROUTER)
-    socket_set_hwm(router, 0)
-    router.bind("tcp://*:6000") 
-
     print("Connecting to server...")
     socket = context.socket(zmq.REQ)
     socket.connect("tcp://172.17.0.4:5555")
@@ -100,8 +96,11 @@ if __name__ == '__main__':
             message = socket.recv()
             if message == 'Cover':
                 cover_num += 1
-            if cover_num == 100:
-                print("Send 100 message")
+                print('Receive new message')
+            else:
+                with open('save/cartpole-{}.h5'.format(e), 'wb') as f:
+                    f.write(message)
+                    print('Cover new model')
 
             state = next_state
             if done:
@@ -109,38 +108,5 @@ if __name__ == '__main__':
                 break
             #if len(agent.replay_buffer) > batch_size:
             #    agent.replay(batch_size)
-        if e % 5 == 0:
-            agent.save('./save/cartpole-dqn' + str(e/5) + '.h5')
-            #TODO: send .h5
-            
-
-ctx = zmq.Context()
-CHUNK_SIZE = 250000
-file = open("testdata", "rb")
-router = ctx.socket(zmq.ROUTER)
-
-# Default HWM is 1000, which will drop messages here
-# since we send more than 1,000 chunks of test data,
-# so set an infinite HWM as a simple, stupid solution:
-socket_set_hwm(router, 0)
-router.bind("tcp://*:6000")
-
-while True:
-    # First frame in each message is the sender identity
-    # Second frame is "fetch" command
-    try:
-        identity, command = router.recv_multipart()
-    except zmq.ZMQError as e:
-        if e.errno == zmq.ETERM:
-            break   # shutting down, quit
-            # return       
-        else:
-            raise
-
-    assert command == b"fetch"
-
-    while True:
-        data = file.read(CHUNK_SIZE)
-        router.send_multipart([identity, data])
-        if not data:
-            break
+        # if e % 10 == 0:
+        #     agent.save('./save/cartpole-dqn.h5')

@@ -64,11 +64,6 @@ class DQNAgent:
 
 if __name__ == '__main__':
     context = zmq.Context()
-    CHUNK_SIZE = 250000
-    router = context.socket(zmq.ROUTER)
-    socket_set_hwm(router, 0)
-    router.bind("tcp://*:6000") 
-
     print("Connecting to server...")
     socket = context.socket(zmq.REQ)
     socket.connect("tcp://172.17.0.4:5555")
@@ -110,9 +105,7 @@ if __name__ == '__main__':
             #if len(agent.replay_buffer) > batch_size:
             #    agent.replay(batch_size)
         if e % 5 == 0:
-            agent.save('./save/cartpole-dqn' + str(e/5) + '.h5')
-            #TODO: send .h5
-            
+            agent.save('./save/cartpole-dqn' + str(epochs/5) + '.h5')
 
 ctx = zmq.Context()
 CHUNK_SIZE = 250000
