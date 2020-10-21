@@ -2,6 +2,7 @@ import random
 import os
 import zmq
 import json
+import experience_pb2
 from collections import deque
 
 import gym
@@ -53,14 +54,19 @@ if __name__ == '__main__':
 
     agent = DQNAgent(state_size, action_size)
 
-    os.environ['KMP_WARNINGS'] = '0'  # 屏蔽INFO and warning信息
-    socket = zmq.Context().socket(zmq.REQ)
+    os.environ['KMP_WARNINGS'] = '0'
+    socket = zmq.Context().socket(zmq.DEALER)
     socket.connect("tcp://172.20.0.4:6080")
+
+    model_path = "./model_weights"
+    if os.path.exists(model_path):
+        os.system("rm -rf " + model_path)
+    os.mkdir(model_path)
 
     done = False
     batch_size = 32
     num_episodes = 1000
-    cnt = 0  # 接收leaner传来模型的定时器
+    cnt = 0
     for e in range(num_episodes):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
@@ -70,19 +76,31 @@ if __name__ == '__main__':
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
             state = next_state
-            socket.send_string(json.dumps({
-                "now_state": state.tolist(),
-                "action": int(action),
-                "reward": reward,
-                "next_state": next_state.tolist(),
-                "done": done,
-            }))
-            socket.recv_string()
+
+            exper = experience_pb2.Exper()
+            exper.now_state.pos.extend(state.tolist()[0])
+            exper.action = action
+            exper.reward = reward
+            exper.next_state.pos.extend(next_state.tolist()[0])
+            exper.done = done
+
+            socket.send(exper.SerializeToString())
             cnt += 1
+
             if done:
                 print('actor -- episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
-            if cnt >= batch_size:
-                cnt = 0
+            if cnt > batch_size:
+                # weights = socket.recv()
+                # with open(model_path + "/syf-eposide_{}-time_{}.h5".format(e, time),"wb") as file:
+                #     file.write(weights)
+                # agent.load(model_path + "/syf-eposide_{}-time_{}.h5".format(e, time))
                 if agent.epsilon > agent.epsilon_min:
                     agent.epsilon *= agent.epsilon_decay
+        
+        if e % 3 == 0:
+            weights = socket.recv()
+            with open(model_path + "/syf-eposide_{}-time_{}.h5".format(e, time),"wb") as file:
+                file.write(weights)
+            agent.load(model_path + "/syf-eposide_{}-time_{}.h5".format(e, time))
+            print("actor -- updata model")
