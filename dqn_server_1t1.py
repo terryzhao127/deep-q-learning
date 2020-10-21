@@ -77,18 +77,23 @@ if __name__ == '__main__':
     done = False
     batch_size = 32
     num_episodes = 1000
-    cover_num = 0
+    cover_num = 0 
     for e in range(num_episodes):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
+        send_flag = 0
         for time in range(500):
             
             message = socket.recv()
             if e % 2 == 0:
-                agent.save('./save/cartpole-dqn{}.h5'.format(e))
-                with open('save/cartpole-dqn{}.h5'.format(e), 'rb') as f:
-                    msend = f.read()
-                socket.send(msend)
+                if send_flag == 0:
+                    agent.save('./save/cartpole-dqn{}.h5'.format(e))
+                    with open('save/cartpole-dqn{}.h5'.format(e), 'rb') as f:
+                        msend = f.read()
+                    socket.send(msend)
+                    send_flag = 1
+                else:
+                    socket.send(b"Cover")
             else:
                 socket.send(b"Cover")
             
