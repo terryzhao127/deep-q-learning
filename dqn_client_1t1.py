@@ -94,9 +94,10 @@ if __name__ == '__main__':
             #print(message)
             socket.send(bytes(message, encoding = "utf8"))
             message = socket.recv()
-            if message == 'Cover':
+            if message == b'Cover':
                 cover_num += 1
-                print('Receive new message')
+                if cover_num == 100:
+                    print('Receive 100 message')
             else:
                 with open('save/cartpole-dqn{}.h5'.format(e), 'wb') as f:
                     f.write(message)
