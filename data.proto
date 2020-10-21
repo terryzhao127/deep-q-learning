@@ -1,0 +1,11 @@
+syntax="proto2";
+message Data{
+  message State{
+    required float element=1;
+  }
+  repeated State state=1;
+  required int32 action=2;
+  required float reward=3;
+  repeated State next_state=4;
+  required bool done=5;
+}

@@ -1,4 +1,6 @@
+from data_pb2 import Data
 import zmq
+import os
 import random
 from collections import deque
 
@@ -76,7 +78,7 @@ if __name__ == '__main__':
     socket = context.socket(zmq.REQ)
     socket.connect("tcp://172.17.0.8:5555")
     #socket.connect("tcp://localhost:5555")
-    os.environ['KMP_WARNINGS'] = 'off'
+    os.environ['KMP_WARNINGS']='off'
 
     for e in range(num_episodes):
         state = env.reset()
@@ -87,8 +89,16 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
-
-            socket.send(str([state.tolist(),action,reward,next_state.tolist(),done]).encode())
+            data=Data()
+            data.action=action
+            data.reward=reward
+            data.done=done
+            for i in range(4):
+                temp1=data.state.add()
+                temp1.element=state[0][i]
+                temp2=data.next_state.add()
+                temp2.element=next_state[0][i]
+            socket.send(data.SerializeToString())
             agent.memorize(state, action, reward, next_state, done)
             state = next_state
             message = socket.recv()

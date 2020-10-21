@@ -1,3 +1,4 @@
+from data_pb2 import Data
 import zmq
 import os
 import random
@@ -83,16 +84,19 @@ if __name__ == '__main__':
         #state = np.reshape(state, [1, state_size])
         for time in range(500):
             # env.render()
-            #action = agent.act(state)
-            #next_state, reward, done, _ = env.step(action)
-            #reward = reward if not done else -10
-            #next_state = np.reshape(next_state, [1, state_size])
-            message = eval(socket.recv().decode())
-            #print(message)
-            agent.memorize(np.array(message[0]), message[1], message[2],np.array(message[3]), message[4])
+            message=Data()
+            message.ParseFromString(socket.recv())
+            action=message.action
+            reward=message.reward
+            done=message.done
+            state=np.zeros([1,4],dtype=float)
+            next_state=np.zeros([1,4],dtype=float)
+            for i in range(4):
+                state[0][i]=message.state[i].element
+                next_state[0][i]=message.next_state[i].element
+            agent.memorize(state,action,reward,next_state,done)
             #file.write(str((state,action,reward,next_state,done))+'\n')
             #state = next_state
-            done=message[4]
             socket.send(b"1")
             if done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
