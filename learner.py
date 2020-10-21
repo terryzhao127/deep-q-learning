@@ -79,11 +79,19 @@ if __name__ == '__main__':
     os.environ['KMP_WARNINGS']='off'
 
     for e in range(num_episodes):
-
+        #state = env.reset()
+        #state = np.reshape(state, [1, state_size])
         for time in range(500):
-
+            # env.render()
+            #action = agent.act(state)
+            #next_state, reward, done, _ = env.step(action)
+            #reward = reward if not done else -10
+            #next_state = np.reshape(next_state, [1, state_size])
             message = eval(socket.recv().decode())
+            #print(message)
             agent.memorize(np.array(message[0]), message[1], message[2],np.array(message[3]), message[4])
+            #file.write(str((state,action,reward,next_state,done))+'\n')
+            #state = next_state
             done=message[4]
             socket.send(b"1")
             if done:
@@ -91,5 +99,6 @@ if __name__ == '__main__':
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        # if e % 10 == 0:
-        #     agent.save('./save/cartpole-dqn.h5')
+        if e % 10 == 0:
+            agent.save('./save/cartpole-dqn.h5')
+            print('model saved')

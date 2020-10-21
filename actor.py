@@ -1,5 +1,4 @@
 import zmq
-import os
 import random
 from collections import deque
 
@@ -90,7 +89,6 @@ if __name__ == '__main__':
             next_state = np.reshape(next_state, [1, state_size])
 
             socket.send(str([state.tolist(),action,reward,next_state.tolist(),done]).encode())
-            #print([state,action,reward,next_state,done])
             agent.memorize(state, action, reward, next_state, done)
             state = next_state
             message = socket.recv()
