@@ -2,7 +2,9 @@ import random
 import zmq
 import os
 import json
+import experience_pb2
 from collections import deque
+
 
 import gym
 import numpy as np
@@ -36,12 +38,6 @@ class DQNAgent:
     def memorize(self, state, action, reward, next_state, done):
         self.replay_buffer.append((state, action, reward, next_state, done))
 
-    def act(self, state):
-        if np.random.rand() <= self.epsilon:
-            return random.randrange(self.action_size)
-        act_values = self.model.predict(state)
-        return np.argmax(act_values[0])  # returns action
-
     def replay(self, batch_size):
         minibatch = random.sample(self.replay_buffer, batch_size)
         for state, action, reward, next_state, done in minibatch:
@@ -69,27 +65,44 @@ if __name__ == '__main__':
     agent = DQNAgent(state_size, action_size)
 
     os.environ['KMP_WARNINGS'] = '0'
-    socket = zmq.Context().socket(zmq.REP)
+    socket = zmq.Context().socket(zmq.ROUTER)
     socket.bind("tcp://*:6080")
 
-    os.mkdir("./save")
+    model_path = "./model_weights"
+    if os.path.exists(model_path):
+        os.system("rm -rf " + model_path)
+    os.mkdir(model_path)
 
     batch_size = 32
     num_episodes = 1000
-    cnt = 0
     for e in range(num_episodes):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
         print("learner -- train episode {}".format(e))
         for time in range(500):
-            data = json.loads(socket.recv_string())
-            socket.send_string("receive data successfully!")
+            id, raw_data = socket.recv_multipart()
+            data = experience_pb2.Exper()
+            data.ParseFromString(raw_data)
+            data = {
+                "now_state": [data.now_state.pos],
+                "action": data.action,
+                "reward": data.reward,
+                "next_state": [data.next_state.pos],
+                "done": data.done,
+            }
+
             agent.memorize(np.array(data["now_state"]), data["action"], data["reward"], np.array(data["next_state"]), data["done"])
-            cnt += 1
             if data["done"]:
                 break
-            if cnt >= batch_size:
-                cnt = 0
+            if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        if e % 10 == 0:
-             agent.save('./save/syf-dqn-learner.h5')
+                # agent.save(model_path + "/syf-eposide_{}-time_{}.h5".format(e, time))
+                # with open(model_path + "/syf-eposide_{}-time_{}.h5".format(e, time), "rb") as file:
+                #     socket.send_multipart([id, file.read()])
+
+        if e % 3 == 0:
+            print("learner -- send model")
+            agent.save(model_path + "/syf-eposide_{}.h5".format(e, time))
+            with open(model_path + "/syf-eposide_{}.h5".format(e, time), "rb") as file:
+                socket.send_multipart([id, file.read()])
+
