@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package experience;
+
+message Exper {
+    required state now_state = 1;
+    required int64 action = 2;
+    required double reward = 3;
+    required state next_state = 4;
+    required bool done = 5;
+
+    message state {
+        repeated double pos = 1;
+    }
+}
