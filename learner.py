@@ -72,20 +72,25 @@ if __name__ == '__main__':
     done = False
     batch_size = 32
     num_episodes = 1000
-    num_episodes=100
+    PIPELINE=10
 
     context = zmq.Context()
-    socket = context.socket(zmq.REP)
+    socket = context.socket(zmq.ROUTER)
     socket.bind("tcp://*:5555")
     os.environ['KMP_WARNINGS']='off'
+    id
+
+    if not os.path.exists('save'):
+        os.makedirs('save')
 
     for e in range(num_episodes):
         #state = env.reset()
         #state = np.reshape(state, [1, state_size])
         for time in range(500):
             # env.render()
+            id,message0=socket.recv_multipart()
             message=Data()
-            message.ParseFromString(socket.recv())
+            message.ParseFromString(message0)
             action=message.action
             reward=message.reward
             done=message.done
@@ -97,12 +102,15 @@ if __name__ == '__main__':
             agent.memorize(state,action,reward,next_state,done)
             #file.write(str((state,action,reward,next_state,done))+'\n')
             #state = next_state
-            socket.send(b"1")
+            #socket.send(b"1")
             if done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        if e % 10 == 0:
-            agent.save('./save/cartpole-dqn.h5')
-            print('model saved')
+        if e % 5 == 0:
+            agent.save('./save/cartpole-dqn-{}.h5'.format(e))
+            file=open('./save/cartpole-dqn-{}.h5'.format(e),'rb')
+            socket.send_multipart([id,file.read()])
+            print('model sent')
+            file.close()

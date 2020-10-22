@@ -67,18 +67,21 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
-    agent.load('./save/cartpole-dqn.h5')
+    #agent.load('./save/cartpole-dqn.h5')
 
     done = False
     batch_size = 32
     num_episodes = 1000
-    num_episodes=100
+    PIPELINE=10
 
     context = zmq.Context()
-    socket = context.socket(zmq.REQ)
+    socket = context.socket(zmq.DEALER)
     socket.connect("tcp://172.17.0.8:5555")
     #socket.connect("tcp://localhost:5555")
     os.environ['KMP_WARNINGS']='off'
+
+    if not os.path.exists('save'):
+        os.makedirs('save')
 
     for e in range(num_episodes):
         state = env.reset()
@@ -101,12 +104,18 @@ if __name__ == '__main__':
             socket.send(data.SerializeToString())
             agent.memorize(state, action, reward, next_state, done)
             state = next_state
-            message = socket.recv()
+            #message = socket.recv()
             if done:
                 # print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 print("current episode: %d"%e)
                 break
-            # if len(agent.replay_buffer) > batch_size:
-            #     agent.replay(batch_size)
-        # if e % 10 == 0:
-        #     agent.save('./save/cartpole-dqn.h5')
+            if len(agent.replay_buffer) > batch_size:
+                if agent.epsilon > agent.epsilon_min:
+                    agent.epsilon *= agent.epsilon_decay
+                #agent.replay(batch_size)
+        if e % 5 == 0:
+            parameters=socket.recv()
+            file=open('./save/cartpole-dqn-{}.h5'.format(e),'wb')
+            file.write(parameters)
+            file.close()
+            agent.load('./save/cartpole-dqn-{}.h5'.format(e))
