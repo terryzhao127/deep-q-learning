@@ -1,3 +1,5 @@
+import zmq
+import json
 import random
 from collections import deque
 
@@ -20,8 +22,8 @@ class DQNAgent:
         self.learning_rate = 0.001
         self.model = self._build_model()
 
+    # policy network
     def _build_model(self):
-        """Build Neural Net for Deep Q-learning Model"""
         model = Sequential()
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
@@ -29,15 +31,18 @@ class DQNAgent:
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
 
+    # Add experience to buffer pool
     def memorize(self, state, action, reward, next_state, done):
         self.replay_buffer.append((state, action, reward, next_state, done))
 
+    # Policy network samples action
     def act(self, state):
-        if np.random.rand() <= self.epsilon:    # np.random.rand(): [0, 1]
+        if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         act_values = self.model.predict(state)
         return np.argmax(act_values[0])  # returns action
 
+    # Fetch a minibatch from buffer pool, apdate the weights
     def replay(self, batch_size):
         minibatch = random.sample(self.replay_buffer, batch_size)
         for state, action, reward, next_state, done in minibatch:
@@ -65,28 +70,25 @@ if __name__ == '__main__':
     agent = DQNAgent(state_size, action_size)
     # agent.load('./save/cartpole-dqn.h5')
 
-    file = open('data.txt', 'w')
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://172.17.0.10:5000")
+
     done = False
     batch_size = 32
-    num_episodes = 20
+    num_episodes = 1000
     for e in range(num_episodes):
-        state = env.reset()
-        state = np.reshape(state, [1, state_size])
+        print('Train episode {}'.format(e))
         for time in range(500):
-            # env.render()
-            action = agent.act(state)
-            next_state, reward, done, _ = env.step(action)
-            reward = reward if not done else -10
-            next_state = np.reshape(next_state, [1, state_size])
-            file.write(str([state, action, reward, next_state, done]))
-            file.write('\n')
-            agent.memorize(state, action, reward, next_state, done)
-            state = next_state
-            if done:
-                print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
+            socket.send_string("message")
+            data = json.loads(socket.recv_string())
+
+            keys = ['state', 'action', 'reward', 'next_state', 'done']
+            item = [data[key] for key in keys]
+            agent.memorize(np.array(item[0]), item[1], item[2], np.array(item[3]), item[4])
+            if data['done']:
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        # if e % 10 == 0:
-        #     agent.save('./save/cartpole-dqn.h5')
-    file.close()
+        if e % 10 == 0:
+            agent.save('./save/cartpole-dqn_{}.h5'.format(e))
