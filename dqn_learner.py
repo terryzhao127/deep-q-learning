@@ -1,3 +1,6 @@
+import os
+import zmq
+import json
 import random
 from collections import deque
 
@@ -33,12 +36,6 @@ class DQNAgent:
     def memorize(self, state, action, reward, next_state, done):
         self.replay_buffer.append((state, action, reward, next_state, done))
 
-    def act(self, state):
-        if np.random.rand() <= self.epsilon:
-            return random.randrange(self.action_size)
-        act_values = self.model.predict(state)
-        return np.argmax(act_values[0])  # returns action
-
     def replay(self, batch_size):
         minibatch = random.sample(self.replay_buffer, batch_size)
         for state, action, reward, next_state, done in minibatch:
@@ -66,24 +63,20 @@ if __name__ == '__main__':
     agent = DQNAgent(state_size, action_size)
     # agent.load('./save/cartpole-dqn.h5')
 
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://172.20.0.2:6080")
+
     done = False
     batch_size = 32
     num_episodes = 1000
     for e in range(num_episodes):
-        state = env.reset()
-        state = np.reshape(state, [1, state_size])
+        print('learner -- train episode {}'.format(e))
         for time in range(500):
-            # env.render()
-            action = agent.act(state)
-            next_state, reward, done, _ = env.step(action)
-            reward = reward if not done else -10
-            next_state = np.reshape(next_state, [1, state_size])
-            agent.memorize(state, action, reward, next_state, done)
-            state = next_state
-            if done:
-                print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
+            socket.send_string("start")
+            data = json.loads(socket.recv_string())
+            agent.memorize(np.array(data['now_state']), data['action'], data['reward'], np.array(data['next_state']), data['done'])
+            if data['done']:
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        # if e % 10 == 0:
-        #     agent.save('./save/cartpole-dqn.h5')
