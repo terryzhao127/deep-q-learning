@@ -92,3 +92,4 @@ if __name__ == '__main__':
                 agent.replay(batch_size)
         if e % 10 == 0:
             agent.save('./save/cartpole-dqn_{}.h5'.format(e))
+            print("Model: cartpole-dqn_{}.h5 saved.".format(e))
