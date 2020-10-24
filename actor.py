@@ -1,6 +1,7 @@
 import zmq
 import json
 import random
+import os
 from collections import deque
 
 import gym
@@ -64,7 +65,9 @@ if __name__ == '__main__':
 
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    socket.bind("tcp://*:5000")
+    socket.bind("tcp://*:2000")
+
+    if not os.path.exists('actorRecv'): os.mkdir('actorRecv')
 
     cnt = 0
     done = False
@@ -74,6 +77,14 @@ if __name__ == '__main__':
         state = env.reset()
         state = np.reshape(state, [1, state_size])
         for time in range(500):
+
+            weight = socket.recv()
+            if len(weight):
+                print('Model received')
+                with open('actorRecv/cartpole-dqn_{}.h5'.format(e), 'wb') as file:
+                    file.write(weight)
+                agent.load('actorRecv/cartpole-dqn_{}.h5'.format(e))
+
             # env.render()
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)
@@ -82,7 +93,6 @@ if __name__ == '__main__':
 
             data = {'state': state.tolist(), 'action': int(action), 'reward': reward, 'next_state': next_state.tolist(), 'done': done}
             cnt += 1
-            message = socket.recv_string()
             socket.send_string(json.dumps(data))
 
             state = next_state
@@ -92,6 +102,3 @@ if __name__ == '__main__':
 
             if cnt > batch_size:
                 agent.replay(batch_size)
-
-        if e % 10 == 1:
-            agent.load('./save/cartpole-dqn_{}.h5'.format(e-1))
