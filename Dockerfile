@@ -22,8 +22,7 @@ COPY learner.py /
 #COPY cartpole-dqn.h5 /save/
 
 git clone https://github.com/google/protobuf.git  
-cd protobuf/ 
-./autogen.sh 
+RUN protobuf/autogen.sh 
 
 COPY data.proto /
 RUN protoc -I=. --python_out=.  data.proto
