@@ -68,19 +68,23 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
-    # agent.load('./save/cartpole-dqn.h5')
 
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.connect("tcp://172.17.0.10:5000")
+    socket.connect("tcp://172.17.0.10:2000")
 
     done = False
     batch_size = 32
     num_episodes = 1000
+    weight = b''
     for e in range(num_episodes):
         print('Train episode {}'.format(e))
         for time in range(500):
-            socket.send_string("message")
+
+            socket.send(weight)
+            if len(weight):
+                print('Model sent')
+                weight = b''
             data = json.loads(socket.recv_string())
 
             keys = ['state', 'action', 'reward', 'next_state', 'done']
@@ -90,6 +94,9 @@ if __name__ == '__main__':
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        if e % 10 == 0:
+
+        if e % 5 == 0:
             agent.save('./save/cartpole-dqn_{}.h5'.format(e))
-            print("Model: cartpole-dqn_{}.h5 saved.".format(e))
+            # print("Model: cartpole-dqn_{}.h5 saved.".format(e))
+            with open('./save/cartpole-dqn_{}.h5'.format(e), 'rb') as file:
+                weight = file.read()
