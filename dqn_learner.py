@@ -63,7 +63,6 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
-
     os.environ['KMP_WARNINGS'] = '0'
     socket = zmq.Context().socket(zmq.ROUTER)
     socket.bind("tcp://*:6080")
@@ -105,4 +104,3 @@ if __name__ == '__main__':
             agent.save(model_path + "/syf-eposide_{}.h5".format(e, time))
             with open(model_path + "/syf-eposide_{}.h5".format(e, time), "rb") as file:
                 socket.send_multipart([id, file.read()])
-
