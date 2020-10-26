@@ -3,7 +3,7 @@ import zmq
 from collections import deque
 
 import gym
-from numpy import *
+import numpy as np
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
@@ -35,22 +35,25 @@ class DQNAgent:
         self.replay_buffer.append((state, action, reward, next_state, done))
 
     def act(self, state):
-        if random.rand() <= self.epsilon:#以概率epsilon随机决策
+        if np.random.rand() <= self.epsilon:#以概率epsilon随机决策
             return random.randrange(self.action_size)
         act_values = self.model.predict(state)#经过神经网络给出一个决策
-        return argmax(act_values[0])  # returns action
+        return np.argmax(act_values[0])  # returns action
 
     def replay(self, batch_size):
         minibatch = random.sample(self.replay_buffer, batch_size)#随机在replay_buffer中取batch_size个样本
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
-                target += self.gamma * amax(self.model.predict(next_state)[0])
+                target += self.gamma * np.amax(self.model.predict(next_state)[0])
             target_f = self.model.predict(state)
             target_f[0][action] = target
             self.model.fit(state, target_f, epochs=1, verbose=0)#训练网络
         if self.epsilon > self.epsilon_min:#每消耗batch_size个数据，epsilon减小一次
             self.epsilon *= self.epsilon_decay
+
+    def save(self, name):
+        self.model.save_weights(name)
 
 
 
@@ -65,25 +68,36 @@ if __name__ == '__main__':
 
     done = False#游戏结束标志
     batch_size = 32
-    num_episodes = 1000
+    #num_episodes = 1000
     
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    socket.bind("tcp://*:6658")
+    socket.bind("tcp://*:6659")
 
+    counter = 1
+    version = 1
     while True:
 
         #  Wait for next request from client
         message = socket.recv()
-        print("Received request: %s" % message)
-        agent.memorize(eval(message)[0], eval(message)[1], eval(message)[2], eval(message)[3], eval(message)[4])
+        sendb = b''
+        #print("Received request: %s" % message)
+        agent.memorize(np.array(eval(message)[0]), eval(message)[1], eval(message)[2], np.array(eval(message)[3]), eval(message)[4])
 
         #更新模型
-        #if len(agent.replay_buffer) > batch_size:
-            #agent.replay(batch_size)
-        
+        if len(agent.replay_buffer) > batch_size:
+            agent.replay(batch_size)
+            print("train epoch: ",counter)
+            if counter % 10 == 0:
+                agent.save('dqn_pra{}.h5'.format(version))
+                fo = open('dqn_pra{}.h5'.format(version), 'rb')
+                sendb = fo.read()
+                fo.close()
+                print('dqn_pra{}.h5 saved'.format(version))
+                version += 1
+            counter += 1
+            
         #  Send reply back to client
-        socket.send(b"got data")
+        socket.send(sendb)
         
-
-
+        
