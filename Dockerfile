@@ -1,4 +1,4 @@
-FROM continuumio/anaconda3 
+FROM python:3.7
 RUN apt-get update
 RUN apt-get install vim -y
 RUN apt-get install tmux -y
@@ -6,23 +6,25 @@ RUN apt-get install lrzsz -y
 RUN apt-get install autoconf -y
 RUN apt-get install automake -y
 RUN apt-get install libtool -y
-COPY env.yml /
 
-RUN conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free/
-RUN conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/
-RUN conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/
-RUN conda config --set show_channel_urls yes	
-RUN conda env create -f env.yml
-RUN conda install pyzmq -y
-RUN conda install protobuf -y
+RUN pip install tensorflow==1.15
+RUN pip install pyzmq
+RUN pip install gym gym[atari]
+#RUN pip install protobuf
 
-COPY dqn.py /
 COPY actor.py /
 COPY learner.py /
-#COPY cartpole-dqn.h5 /save/
-
-git clone https://github.com/google/protobuf.git  
-RUN protobuf/autogen.sh 
 
 COPY data.proto /
+RUN git clone https://github.com/google/protobuf.git  
+WORKDIR protobuf
+RUN git submodule update --init --recursive
+RUN ./autogen.sh
+RUN ./configure --prefix=$INSTALL_DIR
+RUN make -j4
+RUN make check
+RUN make install
+RUN ldconfig
+WORKDIR /
 RUN protoc -I=. --python_out=.  data.proto
+RUN rm -r protobuf
