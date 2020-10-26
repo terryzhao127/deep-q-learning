@@ -1,3 +1,4 @@
+from data_pb2 import Data
 import zmq
 import os
 import random
@@ -71,25 +72,45 @@ if __name__ == '__main__':
     done = False
     batch_size = 32
     num_episodes = 1000
-    num_episodes=100
+    PIPELINE=10
 
     context = zmq.Context()
-    socket = context.socket(zmq.REP)
+    socket = context.socket(zmq.ROUTER)
     socket.bind("tcp://*:5555")
     os.environ['KMP_WARNINGS']='off'
+    id
+
+    if not os.path.exists('save'):
+        os.makedirs('save')
 
     for e in range(num_episodes):
-
+        #state = env.reset()
+        #state = np.reshape(state, [1, state_size])
         for time in range(500):
-
-            message = eval(socket.recv().decode())
-            agent.memorize(np.array(message[0]), message[1], message[2],np.array(message[3]), message[4])
-            done=message[4]
-            socket.send(b"1")
+            # env.render()
+            id,message0=socket.recv_multipart()
+            message=Data()
+            message.ParseFromString(message0)
+            action=message.action
+            reward=message.reward
+            done=message.done
+            state=np.zeros([1,4],dtype=float)
+            next_state=np.zeros([1,4],dtype=float)
+            for i in range(4):
+                state[0][i]=message.state[i].element
+                next_state[0][i]=message.next_state[i].element
+            agent.memorize(state,action,reward,next_state,done)
+            #file.write(str((state,action,reward,next_state,done))+'\n')
+            #state = next_state
+            #socket.send(b"1")
             if done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        # if e % 10 == 0:
-        #     agent.save('./save/cartpole-dqn.h5')
+        if e % 5 == 0:
+            agent.save('./save/cartpole-dqn-{}.h5'.format(e))
+            file=open('./save/cartpole-dqn-{}.h5'.format(e),'rb')
+            socket.send_multipart([id,file.read()])
+            print('model sent')
+            file.close()
