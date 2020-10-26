@@ -1,7 +1,7 @@
 import os
 import zmq
-import json
 import random
+from io import BytesIO
 from collections import deque
 
 import gym
@@ -9,6 +9,19 @@ import numpy as np
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+
+from data_pb2 import Data
+
+
+def arr2bytes(arr):
+    arr_bytes = BytesIO()
+    np.save(arr_bytes, arr, allow_pickle=False)
+    return arr_bytes.getvalue()
+
+
+def bytes2arr(arr_bytes):
+    arr = np.load(BytesIO(arr_bytes), allow_pickle=False)
+    return arr
 
 
 class DQNAgent:
@@ -83,13 +96,15 @@ if __name__ == '__main__':
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
 
-            data = {'state': state.tolist(), 'action': int(action), 'reward': reward, 'next_state': next_state.tolist(), 'done': done}
-            socket.send_string(json.dumps(data))
+            data = Data(state=arr2bytes(state), next_state=arr2bytes(next_state), action=int(action),
+                        reward=reward, done=done, epoch=e)
+
+            socket.send(data.SerializeToString())
 
             cnt += 1
             state = next_state
             if done:
-                print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
+                print('episode: {}/{}, score: {}, e: {:.2}'.format(e+1, num_episodes, time, agent.epsilon))
                 break
             if cnt > batch_size:
                 if agent.epsilon > agent.epsilon_min:

@@ -1,14 +1,40 @@
 import os
 import zmq
-import json
 import random
+from io import BytesIO
 from collections import deque
 
 import gym
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
+import horovod.tensorflow.keras as hvd
+
+from data_pb2 import Data
+
+
+# Horovod: initialize Horovod.
+hvd.init()
+
+# Horovod: pin GPU to be used to process local rank (one GPU per process)
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.visible_device_list = str(hvd.local_rank())
+K.set_session(tf.Session(config=config))
+
+
+def arr2bytes(arr):
+    arr_bytes = BytesIO()
+    np.save(arr_bytes, arr, allow_pickle=False)
+    return arr_bytes.getvalue()
+
+
+def bytes2arr(arr_bytes):
+    arr = np.load(BytesIO(arr_bytes), allow_pickle=False)
+    return arr
 
 
 class DQNAgent:
@@ -30,7 +56,8 @@ class DQNAgent:
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        # model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        model.compile(loss='mse', optimizer=hvd.DistributedOptimizer(Adam(lr=self.learning_rate)))
         return model
 
     def memorize(self, state, action, reward, next_state, done):
@@ -71,31 +98,34 @@ if __name__ == '__main__':
 
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.connect("tcp://172.17.0.16:5000")
+    socket.connect("tcp://172.17.0.2:5000")
 
-    if not os.path.exists('save_learner'):
-        os.mkdir('save_learner')
+    if hvd.rank() == 0:
+        if not os.path.exists('save_learner'):
+            os.mkdir('save_learner')
 
     done = False
     batch_size = 32
     num_episodes = 1000
     weight = b''
-    for e in range(num_episodes):
-        print('Train episode {}'.format(e))
+    e = 0
+    while e < num_episodes:
+        print('Train episode {}'.format(e+1))
         for time in range(500):
 
             socket.send(weight)
             weight = b''
-            data = json.loads(socket.recv_string())
 
-            keys = ['state', 'action', 'reward', 'next_state', 'done']
-            item = [data[key] for key in keys]
-            agent.memorize(np.array(item[0]), item[1], item[2], np.array(item[3]), item[4])
-            if data['done']:
+            data = Data()
+            data.ParseFromString(socket.recv())
+            state, next_state = bytes2arr(data.state), bytes2arr(data.next_state)
+            agent.memorize(state, data.action, data.reward, next_state, data.done)
+            if data.epoch > e:
+                e = data.epoch
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        if e % 10 == 0:
+        if e % 10 == 0 and hvd.rank() == 0:
             agent.save('save_learner/cartpole-{}.h5'.format(e))
             with open('save_learner/cartpole-{}.h5'.format(e), 'rb') as f:
                 weight = f.read()
