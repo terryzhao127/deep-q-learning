@@ -42,10 +42,6 @@ class DQNAgent:
         act_values = self.model.predict(state)
         return np.argmax(act_values[0])  # returns action
 
-    def replay(self, batch_size):
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
-
     def load(self, name):
         self.model.load_weights(name)
 
@@ -59,11 +55,13 @@ if __name__ == '__main__':
     action_size = env.action_space.n
 
     agent = DQNAgent(state_size, action_size)
-    # agent.load('./save/cartpole-dqn.h5')
 
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.bind("tcp://*:5000")
+
+    if not os.path.exists('save_actor'):
+        os.makedirs('save_actor')
 
     cnt = 0
     done = False
@@ -73,6 +71,12 @@ if __name__ == '__main__':
         state = env.reset()
         state = np.reshape(state, [1, state_size])
         for time in range(500):
+            weight = socket.recv()
+            if len(weight):
+                with open('save_actor/cartpole-{}.h5'.format(e), 'wb') as f:
+                    f.write(weight)
+                agent.load('save_actor/cartpole-{}.h5'.format(e))
+
             # env.render()
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)
@@ -80,17 +84,13 @@ if __name__ == '__main__':
             next_state = np.reshape(next_state, [1, state_size])
 
             data = {'state': state.tolist(), 'action': int(action), 'reward': reward, 'next_state': next_state.tolist(), 'done': done}
-            cnt += 1
-            message = socket.recv_string()
             socket.send_string(json.dumps(data))
 
+            cnt += 1
             state = next_state
             if done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
-
             if cnt > batch_size:
                 if agent.epsilon > agent.epsilon_min:
                     agent.epsilon *= agent.epsilon_decay
-        if e % 10 == 1:
-            agent.load('./save/cartpole-dqn_{}.h5'.format(e-1))
