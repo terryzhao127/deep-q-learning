@@ -1,12 +1,13 @@
 import random
+import zmq
 from collections import deque
 
 import gym
-import zmq
 import numpy as np
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
@@ -22,6 +23,7 @@ class DQNAgent:
 
     def _build_model(self):
         """Build Neural Net for Deep Q-learning Model"""
+
         model = Sequential()
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
@@ -36,7 +38,7 @@ class DQNAgent:
         if np.random.rand() <= self.epsilon:
             return random.randrange(self.action_size)
         act_values = self.model.predict(state)
-        return np.argmax(act_values[0])  # returns action
+        return np.argmax(act_values[0])  
 
     def replay(self, batch_size):
         minibatch = random.sample(self.replay_buffer, batch_size)
@@ -46,35 +48,55 @@ class DQNAgent:
                 target += self.gamma * np.amax(self.model.predict(next_state)[0])
             target_f = self.model.predict(state)
             target_f[0][action] = target
+
+            #训练网络
             self.model.fit(state, target_f, epochs=1, verbose=0)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
+
+    def save(self, name):
+        self.model.save_weights(name)
+
+
 
 
 if __name__ == '__main__':
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    socket.bind("tcp://*:5556")
-
+    socket.bind("tcp://*:6566")
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
-
     agent = DQNAgent(state_size, action_size)
-    done = False
+    # agent.load('./save/cartpole-dqn.h5')
+    done = False#游戏结束标志
     batch_size = 32
-    num_episodes = 1000
-    cover_num = 0
-    for e in range(num_episodes):
-        state = env.reset()
-        state = np.reshape(state, [1, state_size])
-        for time in range(500):
-            message = socket.recv()
-            socket.send(b"Cover")
-            message = eval(message)
-            agent.memorize(np.array(message[0]), message[1], message[2], np.array(message[3]), message[4])
-            if message[4]:
-                print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
-                break
-            if len(agent.replay_buffer) > batch_size:
-                agent.replay(batch_size)
+    #num_episodes = 1000
+
+    counter = 1
+    version = 1
+    while True:
+
+        #  Wait for next request from client
+        message = socket.recv()
+        sendb = b''
+        #print("Received request: %s" % message)
+        agent.memorize(np.array(eval(message)[0]), eval(message)[1], eval(message)[2], np.array(eval(message)[3]), eval(message)[4])
+
+        #更新模型
+        if len(agent.replay_buffer) > batch_size:
+            agent.replay(batch_size)
+            print("train epoch: ",counter)
+            if counter % 3 == 0:
+                agent.save('ver_pra{}.h5'.format(version))
+                fo = open('ver_pra{}.h5'.format(version), 'rb')
+                sendb = fo.read()
+                fo.close()
+                print('ver_pra{}.h5 saved'.format(version))
+                version += 1
+            counter += 1
+            
+        #  Send reply back to client
+        socket.send(sendb)
+        
+        
