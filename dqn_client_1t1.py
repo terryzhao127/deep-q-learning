@@ -33,9 +33,10 @@ class DQNAgent:
 
     def memorize(self, state, action, reward, next_state, done):
         #open('agent_data','a').write(str((state, action, reward, next_state, done)) + '\n')
-        self.replay_buffer.append((state, action, reward, next_state, done))
-        #message = np.array((state, action, reward, next_state, done), dtype = object)
-        #socket.send(message)
+        #self.replay_buffer.append((state, action, reward, next_state, done))
+        message = np.array((state, action, reward, next_state, done), dtype = object)
+        print(message)
+        socket.send(message)
 
     def act(self, state):
         if np.random.rand() <= self.epsilon:
@@ -64,8 +65,9 @@ class DQNAgent:
 
 if __name__ == '__main__':
     context = zmq.Context()
-    socket = context.socket(zmq.REP)
-    socket.bind("tcp://*:5555")
+    print("Connecting to server...")
+    socket = context.socket(zmq.REQ)
+    socket.connect("tcp://172.17.0.4:5555")
 
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
@@ -82,36 +84,30 @@ if __name__ == '__main__':
         state = env.reset()
         state = np.reshape(state, [1, state_size])
         for time in range(500):
-            
+            # env.render()
+            action = agent.act(state)
+            next_state, reward, done, _ = env.step(action)
+            reward = reward if not done else -10
+            next_state = np.reshape(next_state, [1, state_size])
+            #agent.memorize(state, action, reward, next_state, done)
+            message = str((state.tolist(), action, reward, next_state.tolist(), done))
+            #print(message)
+            socket.send(bytes(message, encoding = "utf8"))
             message = socket.recv()
-            socket.send(b"Cover")
-            
-            message = eval(message)
-            agent.memorize(np.array(message[0]), message[1], message[2], np.array(message[3]), message[4])
-        
-            #socket.send(b"Cover")
-            if message[4]:
+            if message == b'Cover':
+                cover_num += 1
+                if cover_num == 100:
+                    print('Receive 100 message')
+            else:
+                with open('save/cartpole-dqn{}.h5'.format(e), 'wb') as f:
+                    f.write(message)
+                    print('Cover new model')
+
+            state = next_state
+            if done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
-            # env.render()
-            #action = agent.act(state)
-            #next_state, reward, done, _ = env.step(action)
-            #reward = reward if not done else -10
-            #next_state = np.reshape(next_state, [1, state_size])
-            #agent.memorize(state, action, reward, next_state, done)
-           
-            #message = socket.recv()
-            #if message == "Cover":
-            #    cover_num += 1
-            #if cover_num == 500:
-            #    print("Send 500 message")
-
-            #state = next_state
-            #if done:
-            #    print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
-            #    break
-            
-            if len(agent.replay_buffer) > batch_size:
-                agent.replay(batch_size)
+            #if len(agent.replay_buffer) > batch_size:
+            #    agent.replay(batch_size)
         # if e % 10 == 0:
         #     agent.save('./save/cartpole-dqn.h5')
