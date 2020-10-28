@@ -104,7 +104,7 @@ if __name__ == '__main__':
             message = Data()
             message.ParseFromString(socket.recv())
             state, next_state = eval(message.state), eval(message.next_state)
-            agent.memorize(np.array(state), data.action, data.reward, np.array(next_state), data.done)
+            agent.memorize(np.array(state), message.action, message.reward, np.array(next_state), message.done)
             socket.send(b"Cover")
             #if e % 2 == 0:
             #    if send_flag == 0:
@@ -122,7 +122,7 @@ if __name__ == '__main__':
             #agent.memorize(np.array(message[0]), message[1], message[2], np.array(message[3]), message[4])
         
             #socket.send(b"Cover")
-            if message[4]:
+            if message.done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
             # env.render()
