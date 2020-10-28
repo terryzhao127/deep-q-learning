@@ -1,13 +1,21 @@
 import random
 from collections import deque
-
+from data_pb2 import Data
 import gym
 import zmq
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
+import horovod.tensorflow.keras as htk
 
+#htk.init()
+#config = tf.ConfigProto()
+#config.gpu_options.allow_growth = True
+#config.gpu_options.visible_device_list = str(htk.local_rank())
+#K.set_session(tf.Session(config=config))
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
@@ -28,7 +36,8 @@ class DQNAgent:
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        #model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        model.compile(loss='mse', optimizer=htk.DistributedOptimizer(Adam(lr=self.learning_rate)))
         return model
 
     def memorize(self, state, action, reward, next_state, done):
@@ -63,6 +72,13 @@ class DQNAgent:
 
 
 if __name__ == '__main__':
+    
+    htk.init()
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    config.gpu_options.visible_device_list = str(htk.local_rank())
+    K.set_session(tf.Session(config=config))
+    
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.bind("tcp://*:5555")
@@ -84,21 +100,26 @@ if __name__ == '__main__':
         send_flag = 0
         for time in range(500):
             
-            message = socket.recv()
-            if e % 2 == 0:
-                if send_flag == 0:
-                    agent.save('./save/cartpole-dqn{}.h5'.format(e))
-                    with open('save/cartpole-dqn{}.h5'.format(e), 'rb') as f:
-                        msend = f.read()
-                    socket.send(msend)
-                    send_flag = 1
-                else:
-                    socket.send(b"Cover")
-            else:
-                socket.send(b"Cover")
+            #message = socket.recv()
+            message = Data()
+            message.ParseFromString(socket.recv())
+            state, next_state = eval(message.state), eval(message.next_state)
+            agent.memorize(np.array(state), data.action, data.reward, np.array(next_state), data.done)
+            socket.send(b"Cover")
+            #if e % 2 == 0:
+            #    if send_flag == 0:
+            #        agent.save('./save/cartpole-dqn{}.h5'.format(e))
+            #        with open('save/cartpole-dqn{}.h5'.format(e), 'rb') as f:
+            #            msend = f.read()
+            #        socket.send(msend)
+            #        send_flag = 1
+            #    else:
+            #        socket.send(b"Cover")
+            #else:
+            #    socket.send(b"Cover")
             
-            message = eval(message)
-            agent.memorize(np.array(message[0]), message[1], message[2], np.array(message[3]), message[4])
+            #message = eval(message)
+            #agent.memorize(np.array(message[0]), message[1], message[2], np.array(message[3]), message[4])
         
             #socket.send(b"Cover")
             if message[4]:

@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+message Data {
+  optional string state = 1;
+  optional int32 action = 2;
+  optional double reward = 3;
+  optional string next_state = 4;
+  optional bool done = 5;
+}

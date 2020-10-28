@@ -1,6 +1,6 @@
 import random
 from collections import deque
-
+from data_pb2 import Data
 import gym
 import zmq
 import numpy as np
@@ -90,9 +90,12 @@ if __name__ == '__main__':
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
             #agent.memorize(state, action, reward, next_state, done)
-            message = str((state.tolist(), action, reward, next_state.tolist(), done))
+            
+            message = Data(state=str(state.tolist()), next_state=str(next_state.tolist()), action=int(action),reward=reward, done=done)
+            socket.send(message.SerializeToString())
+            #message = str((state.tolist(), action, reward, next_state.tolist(), done))
             #print(message)
-            socket.send(bytes(message, encoding = "utf8"))
+            #socket.send(bytes(message, encoding = "utf8"))
             message = socket.recv()
             if message == b'Cover':
                 cover_num += 1
