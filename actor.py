@@ -10,6 +10,9 @@ from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.models import Sequential
 from tensorflow.python.keras.optimizers import Adam
 
+import Experience_pb2 as exp
+
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
@@ -91,9 +94,15 @@ if __name__ == '__main__':
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
 
-            data = {'state': state.tolist(), 'action': int(action), 'reward': reward, 'next_state': next_state.tolist(), 'done': done}
+            expt = exp.Experience()
+            expt.state.extend(state.tolist()[0])
+            expt.action = int(action)
+            expt.reward = reward
+            expt.next_state.extend(next_state.tolist()[0])
+            expt.done = done
             cnt += 1
-            socket.send_string(json.dumps(data))
+            # print(expt.state, expt.action, expt.reward, expt.next_state, expt.done)
+            socket.send(expt.SerializeToString())
 
             state = next_state
             if done:
