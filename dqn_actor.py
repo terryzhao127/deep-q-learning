@@ -55,8 +55,9 @@ if __name__ == '__main__':
     agent = DQNAgent(state_size, action_size)
 
     os.environ['KMP_WARNINGS'] = '0'
+    os.environ["TF_CPP_MIN_LOG_LEVEL"]='1'
     socket = zmq.Context().socket(zmq.DEALER)
-    socket.connect("tcp://172.20.0.4:6080")
+    socket.connect("tcp://172.20.0.2:6080")
 
     model_path = "./model_weights"
     if os.path.exists(model_path):
