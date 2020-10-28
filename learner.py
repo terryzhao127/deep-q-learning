@@ -10,6 +10,11 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
 
+import tensorflow as tf
+from tensorflow.keras import backend as K
+import horovod.tensorflow.keras as hvd
+import math
+
 
 class DQNAgent:
     def __init__(self, state_size, action_size):
@@ -30,7 +35,8 @@ class DQNAgent:
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        #model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        model.compile(loss='mse', optimizer=hvd.DistributedOptimizer(Adam(lr=1.0*hvd.size())))
         return model
 
     def memorize(self, state, action, reward, next_state, done):
@@ -62,6 +68,21 @@ class DQNAgent:
 
 
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    hvd.init()
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    config.gpu_options.visible_device_list = str(hvd.local_rank())
+    K.set_session(tf.Session(config=config))
+    '''
+    callbacks = [
+        # Horovod: broadcast initial variable states from rank 0 to all other processes.
+        # This is necessary to ensure consistent initialization of all workers when
+        # training is started with random weights or restored from a checkpoint.
+        hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+    ]
+    '''
+
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
@@ -82,6 +103,7 @@ if __name__ == '__main__':
 
     if not os.path.exists('save'):
         os.makedirs('save')
+
 
     for e in range(num_episodes):
         #state = env.reset()
@@ -108,9 +130,10 @@ if __name__ == '__main__':
                 break
             if len(agent.replay_buffer) > batch_size:
                 agent.replay(batch_size)
-        if e % 5 == 0:
+        if e % 5 == 0 and hvd.rank()==0:
             agent.save('./save/cartpole-dqn-{}.h5'.format(e))
             file=open('./save/cartpole-dqn-{}.h5'.format(e),'rb')
             socket.send_multipart([id,file.read()])
             print('model sent')
             file.close()
+

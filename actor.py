@@ -62,6 +62,7 @@ class DQNAgent:
 
 
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
@@ -76,7 +77,7 @@ if __name__ == '__main__':
 
     context = zmq.Context()
     socket = context.socket(zmq.DEALER)
-    socket.connect("tcp://172.17.0.8:5555")
+    socket.connect("tcp://172.17.0.16:5555")
     #socket.connect("tcp://localhost:5555")
     os.environ['KMP_WARNINGS']='off'
 
