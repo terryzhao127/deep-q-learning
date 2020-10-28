@@ -67,7 +67,7 @@ if __name__ == '__main__':
     context = zmq.Context()
     print("Connecting to server...")
     socket = context.socket(zmq.REQ)
-    socket.connect("tcp://172.17.0.4:5555")
+    socket.connect("tcp://172.17.0.9:5555")
 
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
