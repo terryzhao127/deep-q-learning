@@ -1,101 +1,65 @@
-import os
 import zmq
-import json
-import random
-from collections import deque
+from tensorflow.keras.optimizers import RMSprop
 
-import gym
-import numpy as np
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.optimizers import Adam
+from utilities.environment import get_env
+from utilities.agent import Learner
+from utilities.data import Data, bytes2arr
+
+import tensorflow as tf
+from tensorflow.keras import backend as K
+import horovod.tensorflow.keras as hvd
 
 
-class DQNAgent:
-    def __init__(self, state_size, action_size):
-        self.state_size = state_size
-        self.action_size = action_size
-        self.replay_buffer = deque(maxlen=2000)
-        self.gamma = 0.95  # Discount Rate
-        self.epsilon = 1.0  # Exploration Rate
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.001
-        self.model = self._build_model()
+# Horovod: initialize Horovod.
+hvd.init()
 
-    def _build_model(self):
-        """Build Neural Net for Deep Q-learning Model"""
+# Horovod: pin GPU to be used to process local rank (one GPU per process)
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.gpu_options.visible_device_list = str(hvd.local_rank())
+K.set_session(tf.Session(config=config))
 
-        model = Sequential()
-        model.add(Dense(24, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(24, activation='relu'))
-        model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
-        return model
-
-    def memorize(self, state, action, reward, next_state, done):
-        self.replay_buffer.append((state, action, reward, next_state, done))
-
-    def act(self, state):
-        if np.random.rand() <= self.epsilon:
-            return random.randrange(self.action_size)
-        act_values = self.model.predict(state)
-        return np.argmax(act_values[0])  # returns action
-
-    def replay(self, batch_size):
-        minibatch = random.sample(self.replay_buffer, batch_size)
-        for state, action, reward, next_state, done in minibatch:
-            target = reward
-            if not done:
-                target += self.gamma * np.amax(self.model.predict(next_state)[0])
-            target_f = self.model.predict(state)
-            target_f[0][action] = target
-            self.model.fit(state, target_f, epochs=1, verbose=0)
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
-
-    def load(self, name):
-        self.model.load_weights(name)
-
-    def save(self, name):
-        self.model.save_weights(name)
+callbacks = [hvd.callbacks.BroadcastGlobalVariablesCallback(0)]
 
 
 if __name__ == '__main__':
-    env = gym.make('CartPole-v1')
-    state_size = env.observation_space.shape[0]
+    env = get_env('PongNoFrameskip-v4', 4)
     action_size = env.action_space.n
+    state_size = env.observation_space.shape
 
-    agent = DQNAgent(state_size, action_size)
-    # agent.load('./save/cartpole-dqn.h5')
+    learner = Learner(state_size, action_size, 'learner_{}'.format(hvd.rank()))
+    learner.update_target_model('model.h5')
+
+    opt = hvd.DistributedOptimizer(RMSprop(learning_rate=0.0001 * hvd.size()))
+    learner.policy_model.compile(loss='huber_loss', optimizer=opt)
 
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.connect("tcp://172.17.0.16:5000")
+    socket.connect("tcp://172.17.0.2:5000")
 
-    if not os.path.exists('save_learner'):
-        os.mkdir('save_learner')
+    batch_size = 32 // hvd.size()
+    num_steps = 1000000 // hvd.size()
+    start_steps = 10000 // hvd.size()
+    update_freq = 1000 // hvd.size()
 
-    done = False
-    batch_size = 32
-    num_episodes = 1000
     weight = b''
-    for e in range(num_episodes):
-        print('Train episode {}'.format(e))
-        for time in range(500):
+    for step in range(num_steps):
 
-            socket.send(weight)
-            weight = b''
-            data = json.loads(socket.recv_string())
+        socket.send(weight)
+        weight = b''
 
-            keys = ['state', 'action', 'reward', 'next_state', 'done']
-            item = [data[key] for key in keys]
-            agent.memorize(np.array(item[0]), item[1], item[2], np.array(item[3]), item[4])
-            if data['done']:
-                break
-            if len(agent.replay_buffer) > batch_size:
-                agent.replay(batch_size)
-        if e % 10 == 0:
-            agent.save('save_learner/cartpole-{}.h5'.format(e))
-            with open('save_learner/cartpole-{}.h5'.format(e), 'rb') as f:
-                weight = f.read()
+        data = Data()
+        data.ParseFromString(socket.recv())
+        state, next_state = bytes2arr(data.state), bytes2arr(data.next_state)
+        learner.memory.add(state, data.action, data.reward, next_state, data.done)
+
+        if step > start_steps:
+            learner.replay(batch_size, callbacks)
+
+            if step % update_freq == 0:
+                learner.update_target_model('model.h5'.format(step))
+
+            if hvd.rank() == 0:
+                learner.policy_model.save_weights('{}/{}'.format(learner.save_dir, 'model.h5'))
+                with open('{}/model.h5'.format(learner.save_dir), 'rb') as f:
+                    weight = f.read()
