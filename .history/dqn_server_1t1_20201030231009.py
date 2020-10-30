@@ -4,7 +4,7 @@ import zmq
 import numpy as np
 import tensorflow as tf
 import horovod.tensorflow.keras as htk
-from wrappers import *
+from dqn.wrappers import *
 from collections import deque
 from data_pb2 import Data
 from tensorflow.keras import Sequential

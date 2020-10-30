@@ -1,16 +1,15 @@
 import random
+from collections import deque
+from data_pb2 import Data
 import gym
 import zmq
 import numpy as np
 import tensorflow as tf
-import horovod.tensorflow.keras as htk
-from wrappers import *
-from collections import deque
-from data_pb2 import Data
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Conv2D, Dense, Flatten
 from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras import backend as K
+import horovod.tensorflow.keras as htk
 
 #htk.init()
 #config = tf.ConfigProto()
@@ -86,14 +85,8 @@ if __name__ == '__main__':
     socket.bind("tcp://*:5555")
 
     # env init
+
     env = gym.make('PongNoFrameskip-v4', 4)
-    env = NoopResetEnv(env, noop_max=30)
-    env = MaxAndSkipEnv(env, skip=4)
-    env = EpisodicLifeEnv(env)
-    env = FireResetEnv(env)
-    env = WarpFrame(env)
-    env = ClipRewardEnv(env)
-    env = FrameStack(env, 4)
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 

@@ -35,6 +35,7 @@ class DQNAgent:
         #open('agent_data','a').write(str((state, action, reward, next_state, done)) + '\n')
         #self.replay_buffer.append((state, action, reward, next_state, done))
         message = np.array((state, action, reward, next_state, done), dtype = object)
+        print(message)
         socket.send(message)
 
     def act(self, state):
@@ -88,9 +89,13 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
+            #agent.memorize(state, action, reward, next_state, done)
             
             message = Data(state=str(state.tolist()), next_state=str(next_state.tolist()), action=int(action),reward=reward, done=done)
             socket.send(message.SerializeToString())
+            #message = str((state.tolist(), action, reward, next_state.tolist(), done))
+            #print(message)
+            #socket.send(bytes(message, encoding = "utf8"))
             message = socket.recv()
             if message == b'Cover':
                 cover_num += 1
@@ -105,3 +110,7 @@ if __name__ == '__main__':
             if done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
+            #if len(agent.replay_buffer) > batch_size:
+            #    agent.replay(batch_size)
+        # if e % 10 == 0:
+        #     agent.save('./save/cartpole-dqn.h5')

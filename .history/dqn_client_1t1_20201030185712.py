@@ -4,9 +4,9 @@ from data_pb2 import Data
 import gym
 import zmq
 import numpy as np
-
-from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Conv2D, Dense, Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
 
 
 class DQNAgent:
@@ -19,22 +19,23 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
         self.learning_rate = 0.001
-        self.model = self._build_model(state_size, action_size)
+        self.model = self._build_model()
 
-    def _build_model(self, state_size, action_size):
+    def _build_model(self):
         """Build Neural Net for Deep Q-learning Model"""
+
         model = Sequential()
-        model.add(Conv2D(16, 8, 4, activation='relu', input_shape=state_size))
-        model.add(Conv2D(32, 4, 2, activation='relu'))
-        model.add(Flatten())
-        model.add(Dense(256, activation='relu'))
-        model.add(Dense(action_size, activation='linear'))
+        model.add(Dense(24, input_dim=self.state_size, activation='relu'))
+        model.add(Dense(24, activation='relu'))
+        model.add(Dense(self.action_size, activation='linear'))
+        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
 
     def memorize(self, state, action, reward, next_state, done):
         #open('agent_data','a').write(str((state, action, reward, next_state, done)) + '\n')
         #self.replay_buffer.append((state, action, reward, next_state, done))
         message = np.array((state, action, reward, next_state, done), dtype = object)
+        print(message)
         socket.send(message)
 
     def act(self, state):
@@ -88,9 +89,13 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action)
             reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
+            #agent.memorize(state, action, reward, next_state, done)
             
             message = Data(state=str(state.tolist()), next_state=str(next_state.tolist()), action=int(action),reward=reward, done=done)
             socket.send(message.SerializeToString())
+            #message = str((state.tolist(), action, reward, next_state.tolist(), done))
+            #print(message)
+            #socket.send(bytes(message, encoding = "utf8"))
             message = socket.recv()
             if message == b'Cover':
                 cover_num += 1
@@ -105,3 +110,7 @@ if __name__ == '__main__':
             if done:
                 print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
+            #if len(agent.replay_buffer) > batch_size:
+            #    agent.replay(batch_size)
+        # if e % 10 == 0:
+        #     agent.save('./save/cartpole-dqn.h5')

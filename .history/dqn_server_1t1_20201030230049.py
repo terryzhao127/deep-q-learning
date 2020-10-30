@@ -1,16 +1,15 @@
 import random
+from collections import deque
+from data_pb2 import Data
 import gym
 import zmq
 import numpy as np
 import tensorflow as tf
-import horovod.tensorflow.keras as htk
-from wrappers import *
-from collections import deque
-from data_pb2 import Data
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Conv2D, Dense, Flatten
 from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras import backend as K
+import horovod.tensorflow.keras as htk
 
 #htk.init()
 #config = tf.ConfigProto()
@@ -78,7 +77,6 @@ if __name__ == '__main__':
     config.gpu_options.allow_growth = True
     config.gpu_options.visible_device_list = str(htk.local_rank())
     K.set_session(tf.Session(config=config))
-    callbacks = [htk.callbacks.BroadcastGlobalVariablesCallback(0)]
     
     # zmq init
     context = zmq.Context()
@@ -86,14 +84,8 @@ if __name__ == '__main__':
     socket.bind("tcp://*:5555")
 
     # env init
+
     env = gym.make('PongNoFrameskip-v4', 4)
-    env = NoopResetEnv(env, noop_max=30)
-    env = MaxAndSkipEnv(env, skip=4)
-    env = EpisodicLifeEnv(env)
-    env = FireResetEnv(env)
-    env = WarpFrame(env)
-    env = ClipRewardEnv(env)
-    env = FrameStack(env, 4)
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
@@ -107,27 +99,21 @@ if __name__ == '__main__':
     start_steps = 10000 // htk.size()
     update_freq = 1000 // htk.size()
     newmodel = 0
-
     for e in range(num_steps):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
     
         message = Data()
         message.ParseFromString(socket.recv())
-        if newmodel:
-            socket.send(newmodel)
-        else:
-            socket.send(b"Cover")
-
         state, next_state = eval(message.state), eval(message.next_state)
         agent.memorize(np.array(state), message.action, message.reward, np.array(next_state), message.done)
          
+        if newmodel == 0:
+            socket.send(newmodel)
+        else:
+            socket.send(b"Cover")
             
         if e % update_freq == 0:
-            agent.save('save/model.h5')
-            newmodel = open('save/model.h5', 'rb').read()
-        else:
-            newmodel = 0
-
+            agent.save('model.h5')
         if len(agent.replay_buffer) > batch_size:
             agent.replay(batch_size, callbacks)
