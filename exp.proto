@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+message exp{
+
+  bytes state = 1;
+  int32 action = 2;
+  float reward = 3;
+  bytes next_state = 4;
+  bool done = 5;
+
+}
