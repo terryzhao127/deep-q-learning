@@ -7,7 +7,7 @@ from collections import deque
 
 import gym
 import numpy as np
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Conv2D, Flatten
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
 
@@ -28,10 +28,12 @@ class DQNAgent:
         """Build Neural Net for Deep Q-learning Model"""
 
         model = Sequential()
-        model.add(Dense(24, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(24, activation='relu'))
+        model.add(Dense(256, input_dim=self.state_size, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(64, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        
         return model
 
     def act(self, state):
@@ -48,7 +50,7 @@ class DQNAgent:
 
 
 if __name__ == '__main__':
-    env = gym.make('CartPole-v1')
+    env = gym.make('Pong-ram-v0')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
@@ -66,15 +68,19 @@ if __name__ == '__main__':
 
     done = False
     batch_size = 32
-    num_episodes = 1000
+    num_episodes = 100000
     cnt = 0
     for e in range(num_episodes):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
-        for time in range(500):
+        for _ in range(random.randint(1, 30)):
+            state, _, _, _ = env.step(0)
+            state = np.reshape(state, [1, state_size])
+        print("actor -- current episode {}".format(e))
+        for time in range(100000):
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)
-            reward = reward if not done else -10
+            # reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
             state = next_state
 
@@ -89,7 +95,6 @@ if __name__ == '__main__':
             cnt += 1
 
             if done:
-                print('actor -- episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 break
             if cnt > batch_size:
                 # weights = socket.recv()
