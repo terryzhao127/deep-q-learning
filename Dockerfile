@@ -11,6 +11,7 @@ RUN apt-get install libtool -y
 RUN pip install pyzmq
 RUN pip install gym gym[atari]
 RUN pip install --upgrade protobuf
+pip install atari-py
 
 COPY actor.py /
 COPY learner.py /
