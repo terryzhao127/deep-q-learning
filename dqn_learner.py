@@ -76,7 +76,6 @@ if __name__ == '__main__':
     hvd.callbacks.BroadcastGlobalVariablesCallback(0)
 
     agent = DQNAgent(state_size, action_size)
-
     os.environ['KMP_WARNINGS'] = '0'
     os.environ["TF_CPP_MIN_LOG_LEVEL"]='1'
     socket = zmq.Context().socket(zmq.ROUTER)
@@ -132,4 +131,3 @@ if __name__ == '__main__':
             sum = 0
 
     writer.close()
-
