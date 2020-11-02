@@ -32,9 +32,6 @@ if __name__ == '__main__':
         actor.adjust_ep(e)
         action = actor.act(state)
         next_state, reward, done, _ = env.step(action)
-
-        reward = reward if not done else -10
-        next_state = np.reshape(next_state, [1, state_size])
         
         message = Data(state=str(state.tolist()), next_state=str(next_state.tolist()), action=int(action),reward=reward, done=done)
         socket.send(message.SerializeToString())
