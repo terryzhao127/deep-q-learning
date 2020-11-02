@@ -29,7 +29,7 @@ if __name__ == '__main__':
     state_size = env.observation_space.shape
     action_size = env.action_space.n
 
-    learner = Learner(state_size, action_size, 'learner_{}'.format(hvd.rank()))
+    learner = Learner(state_size, action_size, 'save')
     learner.update_target_model('model.h5')
     opt = hvd.DistributedOptimizer(RMSprop(learning_rate=0.0001 * hvd.size()))
     learner.policy_model.compile(loss='huber_loss', optimizer=opt)
@@ -55,7 +55,7 @@ if __name__ == '__main__':
             learner.replay(batch_size, callbacks)
 
         if e % update_freq == 0:
-            learner.save('save/model.h5')
+            learner.update_target_model('model.h5')
             newmodel = open('save/model.h5', 'rb').read()
         else:
             newmodel = 0

@@ -46,6 +46,8 @@ class Learner:
     def __init__(self, state_size, action_size, save_dir='save'):
         self.gamma = 0.99  # Discount Rate
         self.memory = []
+        self.maxsize = 5000
+        self.memid = 0
 
         self.save_dir = save_dir
         if not os.path.exists(self.save_dir):
@@ -60,7 +62,11 @@ class Learner:
         self.target_model.load_weights('{}/{}'.format(self.save_dir, name))
         
     def memorize(self, state, action, reward, next_state, done):
-        self.replay_buffer.append((state, action, reward, next_state, done))
+        if self.memid >= len(self.memory):
+            self.memory.append((state, action, reward, next_state, done))
+        else:
+            self.memory[self.memid] = (state, action, reward, next_state, done)
+        self.memid = (self.memid + 1) % self.maxsize
 
     def replay(self, batch_size, callbacks=None): 
         batch = np.random.randint(0, len(self.memory) - 1, size=batch_size)
