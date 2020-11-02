@@ -59,4 +59,3 @@ if __name__ == '__main__':
 
             state = env.reset()
             episode_rewards.append(0.0)
-
