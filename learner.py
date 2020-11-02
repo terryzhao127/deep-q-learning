@@ -55,7 +55,7 @@ if __name__ == '__main__':
             learner.replay(batch_size, callbacks)
 
         if e % update_freq == 0:
-            learner.save('save/model.h5')
+            learner.update_target_model('save/model.h5')
             newmodel = open('save/model.h5', 'rb').read()
         else:
             newmodel = 0
