@@ -65,7 +65,7 @@ class Learner:
         if self.memid >= len(self.memory):
             self.memory.append((state, action, reward, next_state, done))
         else:
-            self._storage[self.memid] = (state, action, reward, next_state, done)
+            self.memory[self.memid] = (state, action, reward, next_state, done)
         self.memid = (self.memid + 1) % self.maxsize
 
     def replay(self, batch_size, callbacks=None): 
