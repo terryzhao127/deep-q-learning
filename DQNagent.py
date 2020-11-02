@@ -60,7 +60,7 @@ class Learner:
         self.target_model.load_weights('{}/{}'.format(self.save_dir, name))
         
     def memorize(self, state, action, reward, next_state, done):
-        self.replay_buffer.append((state, action, reward, next_state, done))
+        self.memory.append((state, action, reward, next_state, done))
 
     def replay(self, batch_size, callbacks=None): 
         batch = np.random.randint(0, len(self.memory) - 1, size=batch_size)
