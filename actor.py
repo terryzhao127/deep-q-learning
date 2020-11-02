@@ -31,7 +31,7 @@ if __name__ == '__main__':
     for e in range(num_episodes):
         actor.adjust_ep(e)
         action = actor.act(state)
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, done, inf = env.step(action)
         
         message = Data(state=str(state.tolist()), next_state=str(next_state.tolist()), action=int(action),reward=reward, done=done)
         socket.send(message.SerializeToString())
@@ -46,16 +46,16 @@ if __name__ == '__main__':
 
         state = next_state
         episode_rewards[-1] += reward
-
+        print('episode: {}, reward:{}, done:{}'.format(e, reward, done))
         if done:
             count_episodes = len(episode_rewards)
             mean_100ep_reward = round(np.mean(episode_rewards[-100:]), 2)
 
-            print('episode: {}, step: {}/{}, mean reward: {}, epsilon: {:.3f}'.format(
-                count_episodes, e+1, num_episodes, mean_100ep_reward, actor.epsilon))
-            writer.add_scalar('reward', mean_100ep_reward, count_episodes)
-            writer.add_scalar('epsilon', actor.epsilon, count_episodes)
-            writer.flush()
+            #print('episode: {}, step: {}/{}, mean reward: {}, epsilon: {:.3f}'.format(
+            #    count_episodes, e+1, num_episodes, mean_100ep_reward, actor.epsilon))
+            #writer.add_scalar('reward', mean_100ep_reward, count_episodes)
+            #writer.add_scalar('epsilon', actor.epsilon, count_episodes)
+            #writer.flush()
 
             state = env.reset()
             episode_rewards.append(0.0)
