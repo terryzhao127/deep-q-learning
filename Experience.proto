@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+message Experience{
+
+  repeated float state = 1;
+  int32 action = 2;
+  float reward = 3;
+  repeated float next_state = 4;
+  bool done = 5;
+
+}
