@@ -1,4 +1,6 @@
-# deep-q-learning
+# Deep Q Learning
+
+*The codes are copied from <https://github.com/keon/deep-q-learning>, and act as code base for implementing distributed RL (in other branches).*
 
 ![animation](./assets/animation.gif)
 
