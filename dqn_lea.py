@@ -4,9 +4,13 @@ from collections import deque
 
 import gym
 import numpy as np
+from data_pb2 import Data
+import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
+import horovod.tensorflow.keras as htk
 
 
 class DQNAgent:
@@ -28,7 +32,8 @@ class DQNAgent:
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        #model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        model.compile(loss='mse', optimizer=htk.DistributedOptimizer(Adam(lr=self.learning_rate)))
         return model
 
     def memorize(self, state, action, reward, next_state, done):#将信息加入replay_buffer
@@ -59,6 +64,13 @@ class DQNAgent:
 
 
 if __name__ == '__main__':
+    htk.init()
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    config.gpu_options.visible_device_list = str(htk.local_rank())
+    K.set_session(tf.Session(config=config))
+
+
     env = gym.make('CartPole-v1')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
@@ -79,10 +91,12 @@ if __name__ == '__main__':
     while True:
 
         #  Wait for next request from client
-        message = socket.recv()
+        #message = socket.recv()
+        message = Data()
+        message.ParseFromString(socket.recv())
         sendb = b''
         #print("Received request: %s" % message)
-        agent.memorize(np.array(eval(message)[0]), eval(message)[1], eval(message)[2], np.array(eval(message)[3]), eval(message)[4])
+        agent.memorize(np.array(eval(message.state)), message.action, message.reward, np.array(eval(message.next_state)), message.done)
 
         #更新模型
         if len(agent.replay_buffer) > batch_size:

@@ -4,6 +4,7 @@ from collections import deque
 
 import gym
 import numpy as np
+from data_pb2 import Data
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
-    socket.connect("tcp://172.17.0.14:6659")
+    socket.connect("tcp://172.17.0.12:6659")
 
     done = False#游戏结束标志
     batch_size = 32
@@ -72,15 +73,18 @@ if __name__ == '__main__':
             next_state, reward, done, _ = env.step(action) #更新下一时刻状态
             reward = reward if not done else -10 #更新reward
             next_state = np.reshape(next_state, [1, state_size])
-            #agent.memorize(state, action, reward, next_state, done)
-            data_ls = []
-            data_ls.append(state.tolist())
-            data_ls.append(action)
-            data_ls.append(reward)
-            data_ls.append(next_state.tolist())
-            data_ls.append(done)
-            socket.send(bytes(str(data_ls), encoding = "utf8"))
-            print("Sending data : ",data_ls)
+            
+            #data_ls = []
+            #data_ls.append(state.tolist())
+            #data_ls.append(action)
+            #data_ls.append(reward)
+            #data_ls.append(next_state.tolist())
+            #data_ls.append(done)
+            #socket.send(bytes(str(data_ls), encoding = "utf8"))
+            #print("Sending data : ",data_ls)
+
+            message = Data(state=str(state.tolist()), next_state=str(next_state.tolist()), action=int(action),reward=reward, done=done)
+            socket.send(message.SerializeToString())
             model = socket.recv()
 
             state = next_state #状态迭代
