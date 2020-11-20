@@ -101,6 +101,7 @@ if __name__ == '__main__':
             expt.next_state.extend(next_state.tolist()[0])
             expt.done = done
             cnt += 1
+
             # print(expt.state, expt.action, expt.reward, expt.next_state, expt.done)
             socket.send(expt.SerializeToString())
 

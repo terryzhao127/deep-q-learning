@@ -87,6 +87,7 @@ if __name__ == '__main__':
 
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
+
     socket.connect("tcp://172.17.0.13:2000")
     # socket.connect("tcp://localhost:2000")
 
