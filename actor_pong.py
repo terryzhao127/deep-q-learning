@@ -6,7 +6,7 @@ from collections import deque
 
 import gym
 import numpy as np
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense,Conv2D
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
 
@@ -25,10 +25,10 @@ class DQNAgent:
 
     def _build_model(self):
         """Build Neural Net for Deep Q-learning Model"""
-
         model = Sequential()
-        model.add(Dense(24, input_dim=self.state_size, activation='relu'))
-        model.add(Dense(24, activation='relu'))
+        model.add(Dense(256, input_dim=self.state_size, activation='relu'))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dense(64, activation='relu'))
         model.add(Dense(self.action_size, activation='linear'))
         model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
         return model
@@ -62,8 +62,8 @@ class DQNAgent:
 
 
 if __name__ == '__main__':
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    env = gym.make('CartPole-v1')
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
+    env = gym.make('Pong-ram-v0')
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.n
 
@@ -72,13 +72,13 @@ if __name__ == '__main__':
 
     done = False
     batch_size = 32
-    num_episodes = 1000
+    num_episodes = 1000000
     PIPELINE=10
 
     context = zmq.Context()
     socket = context.socket(zmq.DEALER)
-    socket.connect("tcp://172.17.0.16:5555")
-    #socket.connect("tcp://localhost:5555")
+    socket.connect("tcp://172.17.0.10:5557")
+    #socket.connect("tcp://localhost:5557")
     os.environ['KMP_WARNINGS']='off'
 
     if not os.path.exists('save'):
@@ -87,17 +87,20 @@ if __name__ == '__main__':
     for e in range(num_episodes):
         state = env.reset()
         state = np.reshape(state, [1, state_size])
-        for time in range(500):
+        for _ in range(random.randint(1, 30)):
+            state, _, _, _ = env.step(0)
+            state = np.reshape(state, [1, state_size])
+        for time in range(100000):
             # env.render()
             action = agent.act(state)
             next_state, reward, done, _ = env.step(action)
-            reward = reward if not done else -10
+            #reward = reward if not done else -10
             next_state = np.reshape(next_state, [1, state_size])
             data=Data()
             data.action=action
             data.reward=reward
             data.done=done
-            for i in range(4):
+            for i in range(state_size):
                 temp1=data.state.add()
                 temp1.element=state[0][i]
                 temp2=data.next_state.add()
@@ -106,6 +109,7 @@ if __name__ == '__main__':
             agent.memorize(state, action, reward, next_state, done)
             state = next_state
             #message = socket.recv()
+            #print(str(reward)+' '+str(done))
             if done:
                 # print('episode: {}/{}, score: {}, e: {:.2}'.format(e, num_episodes, time, agent.epsilon))
                 print("current episode: %d"%e)
